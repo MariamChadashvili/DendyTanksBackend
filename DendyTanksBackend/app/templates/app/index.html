@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dendy Tanks Game</title>
+    <style>
+        #gameCanvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dendy Tanks Game</h1>
+    <canvas id="gameCanvas" width="800" height="800"></canvas>
+    <script>
+         console.log("game.js is connected!");
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let player_id = null;
+        const ws = new WebSocket(`ws://${window.location.host}/ws/game/1/`);
+
+
+
+        ws.onopen = function(event) {
+            console.log("WebSocket is open now.");
+        };
+
+        ws.onmessage = function(event) {
+            try {
+                let receivedData = JSON.parse(event.data);
+                if (receivedData && typeof receivedData === "string") {
+                    receivedData = JSON.parse(receivedData);
+                    gameData = receivedData;
+                    console.log("Processed game data: ", gameData);
+                    drawGame(gameData);
+                }
+
+                if (receivedData.action === 'assign_player_id') {
+                    player_id = receivedData.player_id;
+                    console.log("Assigned player_id: ", player_id);
+                }
+
+                // if (receivedData) {
+                //     gameData = receivedData;
+                //     console.log("Processed game data: ", gameData);
+                //     drawGame(gameData);
+                // }
+
+                // if (receivedData.action === 'assign_player_id') {
+                //     player_id = receivedData.player_id;
+                //     console.log("Assigned player ID:", player_id);
+                // }else {
+                //     gameData = receivedData;
+                //     drawGame(gameData);
+                // }
+
+                // console.log("Received game data:",gameData);
+                // console.log(JSON.parse(event.data));
+                // drawGame(gameData);
+            } catch (error) {
+                console.error("Error parsing game data:", error);
+            }
+        };
+
+        ws.onclose = function(event) {
+            console.log("WebSocket is closed now.");
+        };
+
+        ws.onerror = function(error) {
+            console.log("WebSocket error: " + error);
+        };
+
+
+        function drawGame(gameData) {
+            if (!gameData || !gameData.map) {
+                console.error("Game data or map is missing:", gameData);
+                return;
+            }
+            players = gameData["players"];
+            game_map = gameData["map"];
+            // console.log(gameData);
+            // console.log("game_map:", game_map);
+            // const {id, name, description, width, height, block_size, bullet_size, bases, walls} = map;
+            width = game_map.width;
+            height = game_map.height;
+            block_size = game_map.block_size;
+            bullet_size = game_map.bullet_size;
+            bases = game_map.bases;
+            walls = game_map.walls;
+
+            canvas.width = width;
+            canvas.height = height;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            function drawSquare(x, y, size, color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, size, size);
+            }
+
+            bases.forEach(base => {
+                const {x_position, y_position} = base.position;
+                drawSquare(x_position, y_position, block_size, 'black');  // Use gray for bases
+            });
+
+            walls.forEach(wall => {
+                const { x_position, y_position } = wall.position;
+                const color = wall.type === 'BRICK' ? 'brown' : 'silver';
+                drawSquare(x_position, y_position, block_size, color);
+            });
+
+            Object.values(players).forEach(player => {
+                const { x_position, y_position } = player.position;
+                drawSquare(x_position, y_position, block_size, player.color.toLowerCase());
+            });
+
+            // Draw bullets
+            Object.values(players).forEach(player => {
+                if (player.bullet) {
+                    const { x_position, y_position } = player.bullet.position;
+                    drawSquare(x_position, y_position, bullet_size, 'black'); // Use black for bullets
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function(event) {
+            const key = event.key;
+            let direction = null;
+
+            if (key === 'ArrowUp') {
+                direction = 'up';
+            } else if (key === 'ArrowDown') {
+                direction = 'down';
+            } else if (key === 'ArrowLeft') {
+                direction = 'left';
+            } else if (key === 'ArrowRight') {
+                direction = 'right';
+            }
+
+            if (direction && player_id) {
+                // Send the movement command to the backend
+                ws.send(JSON.stringify({ action: 'start_move', player_id: player_id, direction: direction }));
+            }
+
+            if (key === 'x' && player_id) {
+                // Send the shoot command to the backend
+                ws.send(JSON.stringify({ action: 'shoot', player_id: player_id }));
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            const key = event.key;
+
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) && player_id) {
+                // Send the stop move command to the backend
+                ws.send(JSON.stringify({ action: 'stop_move', player_id: player_id }));
+            }
+        });
+        drawGame(gameData)
+    </script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

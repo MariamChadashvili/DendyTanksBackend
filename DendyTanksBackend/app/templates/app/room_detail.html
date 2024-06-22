@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room {{ room.id }}</title>
+    <style>
+        .button-container {
+            margin-top: 20px;
+        }
+        #room-info {
+            margin: 20px;
+        }
+        #room-info p {
+            margin: 5px 0;
+        }
+        #start-game-btn {
+            margin: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="button-container">
+{#        <button onclick="window.location.href='/'">Exit room</button>#}
+        <button onclick="exitRoom()">Exit room</button>
+    </div>
+    <h1>Room {{ room.name }}</h1>
+    <div id="room-info">
+        <p>Room ID: {{ room.id }}</p>
+        <p>Name: {{ room.name }}</p>
+        <p>Status: {{ room.status }}</p>
+        <p>Capacity: {{ room.players.count }}/{{ room.capacity }}</p>
+    </div>
+    <h2>Players</h2>
+    <div id="players">
+        <ul>
+            {% for player in room.players.all %}
+                <li>ID: {{ player.id }} - Name: {{ player.name }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    <button id="start-game-btn">Start Game</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const roomId = "{{ room.id }}";
+            const startGameBtn = document.getElementById('start-game-btn');
+
+            startGameBtn.addEventListener('click', function() {
+                fetch(`/api/room/${roomId}/start_game/`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.detail);
+                });
+            });
+        });
+
+        function getPlayerId() {
+            return localStorage.getItem('player_id');
+        }
+
+        function exitRoom() {
+            const userConfirmed = confirm("Are you sure you want to leave the room?");
+            if (userConfirmed) {
+                const roomId = '{{ room.id }}';
+                const playerId = getPlayerId();
+
+                if (playerId) {
+                    fetch(`/api/room/${roomId}/leave/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({player_id: playerId})
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.detail) {
+                                alert(data.detail);
+                            }
+                            window.location.href = '/';
+                        });
+                } else {
+                    window.location.href = '/';
+                }
+            }
+        }
+    </script>
+</body>
+</html>

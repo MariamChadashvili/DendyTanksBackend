@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Rooms</title>
+    <style>
+        .room-list, .create-room {
+            margin: 20px;
+        }
+        .room {
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        .room button {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Available Game Rooms</h1>
+    <div class="room-list" id="room-list"></div>
+    <div class="create-room">
+        <h2>Create a New Room</h2>
+        <form id="create-room-form">
+            <input type="text" id="player-name" placeholder="Your name (optional)">
+            <input type="text" id="room-name" placeholder="Room name" required>
+            <input type="number" id="room-capacity" placeholder="Room capacity" required>
+            <button type="submit">Create Room</button>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const roomList = document.getElementById('room-list');
+            {#function getPlayerId() {#}
+            {#    let playerId = localStorage.getItem('player_id');#}
+            {#    if (!playerId) {#}
+            {#        playerId = `${uuidv4()}`;#}
+            {#        localStorage.setItem('player_id', playerId);#}
+            {#    }#}
+            {#    return playerId;#}
+            function getPlayerId() {
+                return localStorage.getItem('player_id');
+            }
+
+            function setPlayerId(playerId) {
+                localStorage.setItem('player_id', playerId);
+            }
+
+            function clearPlayerId() {
+                localStorage.removeItem('player_id');
+            }
+
+            function fetchRooms() {
+                fetch('/api/room/')
+                    .then(response => response.json())
+                    .then(data => {
+                        roomList.innerHTML = '';
+                        data.forEach(room => {
+                            const roomDiv = document.createElement('div');
+                            roomDiv.className = 'room';
+                            roomDiv.dataset.roomId = room.id;
+                            roomDiv.innerHTML = `
+                                <p>Room ID: ${room.id}</p>
+                                <p>Name: ${room.name}</p>
+                                <p>Status: ${room.status}</p>
+                                <p>Capacity: ${room.players.length}/${room.capacity}</p>
+                                <button class="join-room">Join Room</button>
+                                <button class="delete-room">Delete Room</button>
+                                <button class="update-room">Update Room</button>
+                            `;
+                            roomList.appendChild(roomDiv);
+                        });
+                    });
+            }
+
+            function createRoom(event) {
+                event.preventDefault();
+                const playerName = document.getElementById('player-name').value;
+                let playerId = getPlayerId();
+
+                if (playerName && localStorage.getItem('player_name') !== playerName) {
+                    clearPlayerId();
+                    playerId = `${uuidv4()}`;
+                    setPlayerId(playerId);
+                    localStorage.setItem('player_name', playerName);
+                } else if (!playerId) {
+                    playerId = `${uuidv4()}`;
+                    setPlayerId(playerId);
+                    localStorage.setItem('player_name', playerName);
+                }
+
+                const roomName = document.getElementById('room-name').value;
+                const roomCapacity = document.getElementById('room-capacity').value;
+                const requestBody = {
+                    player_id: playerId,
+                    player_name: playerName,
+                    name: roomName,
+                    capacity: parseInt(roomCapacity)
+                };
+                {#if (playerName) {#}
+                {#    requestBody.player_name = playerName;#}
+
+                fetch('/api/room/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Room created:', data);
+                    fetchRooms();
+                    {#window.location.href = `/room/${roomId}/`;#}
+                });
+            }
+
+            function handleRoomAction(event) {
+                const roomId = event.target.closest('.room').dataset.roomId;
+                if (event.target.classList.contains('join-room')) {
+                    joinRoom(roomId);
+                } else if (event.target.classList.contains('delete-room')) {
+                    deleteRoom(roomId);
+                } else if (event.target.classList.contains('update-room')) {
+                    updateRoom(roomId);
+                }
+            }
+
+            function joinRoom(roomId) {
+                const playerName = prompt("Enter your name:");
+                if (playerName) {
+                    const playerId = `${uuidv4()}`;
+                    setPlayerId(playerId);
+                    localStorage.setItem('player_name', playerName);
+                    setPlayerId(playerId);
+                    fetch(`/api/room/${roomId}/join/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ player_id: playerId, player_name: playerName })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.detail === 'Room is full. Cannot join.') {
+                            alert(data.detail);
+                        } else {
+                            updateRoomDisplay(roomId);
+                            window.location.href = `/room/${roomId}/`;
+                        }
+                    });
+                }
+            }
+
+            {#function startGame(roomId) {#}
+            {#    fetch(`/api/room/${roomId}/start_game/`, {#}
+            {#        method: 'POST'#}
+            {#    })#}
+            {#    .then(response => response.json())#}
+            {#    .then(data => {#}
+            {#        alert(data.detail);#}
+            {#        fetchRooms();#}
+            {#    });#}
+            {##}
+
+
+            function deleteRoom(roomId) {
+                const userConfirmed = confirm("Are you sure you want to delete this room?");
+                if (userConfirmed) {
+                    fetch(`/api/room/${roomId}/`, {
+                        method: 'DELETE'
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            alert('Room deleted successfully');
+                            fetchRooms();
+                        } else {
+                            alert('Failed to delete the room');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error deleting room:', error);
+                        alert('An error occurred while deleting the room');
+                    });
+                }
+            }
+
+            function updateRoom(roomId) {
+                const newName = prompt("Enter new room name:");
+                const newCapacity = prompt("Enter new room capacity (number):");
+                if (newName || newCapacity) {
+                    const body = {
+                      name: newName ? newName : null,
+                      capacity: newCapacity ? parseInt(newCapacity) : null,
+                    };
+                    fetch(`/api/room/${roomId}/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(body)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Room updated:', data);
+                        fetchRooms();
+                    });
+                }
+            }
+
+            function updateRoomDisplay(roomId) {
+            fetch(`/api/room/${roomId}/`)
+                .then(response => response.json())
+                .then(room => {
+                    const roomDiv = document.querySelector(`.room[data-room-id='${roomId}']`);
+                    if (roomDiv) {
+                        roomDiv.querySelector('p:nth-child(3)').textContent = `Status: ${room.status}`;
+                        roomDiv.querySelector('p:nth-child(4)').textContent = `Capacity: ${room.players.length}/${room.capacity}`;
+                    }
+                });
+            }
+
+
+            document.getElementById('create-room-form').addEventListener('submit', createRoom);
+            roomList.addEventListener('click', handleRoomAction);
+
+            fetchRooms();
+        });
+
+        function uuidv4() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+    </script>
+</body>
+</html>
